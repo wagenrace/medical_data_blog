@@ -114,3 +114,4 @@ venv.bak/
 *.json
 */results/
 */data/
+*/temp/
