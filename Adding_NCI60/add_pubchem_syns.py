@@ -14,9 +14,9 @@ pswd = input("password")
 
 graph = Graph("bolt://localhost:" + port, name="pubchem", auth=(user, pswd))
 
+number = 1
 while True:
     # Get
-    number = 1
     download_url = fr"https://ftp.ncbi.nlm.nih.gov/pubchem/RDF/synonym/pc_synonym2compound_{str(number).zfill(6)}.ttl.gz"
     print("download: ", download_url)
 
@@ -33,12 +33,13 @@ while True:
         with open(ttl_file, "w+") as f_out:
             f_out.write(file_content)
 
-    graph.run(f"""CALL n10s.rdf.import.fetch("file:{ttl_file}","Turtle");""")
+    cypher = """CALL n10s.rdf.import.fetch("file:""" + ttl_file.replace("\\", "\\\\") + """","Turtle");"""
+    print(graph.run(cypher).data())
     number += 1
 
+number = 1
 while True:
     # Get
-    number = 1
     download_url = fr"https://ftp.ncbi.nlm.nih.gov/pubchem/RDF/synonym/pc_synonym_value_{str(number).zfill(6)}.ttl.gz"
     print("download: ", download_url)
 
@@ -54,5 +55,7 @@ while True:
         file_content = file_content.decode("utf-8")
         with open(ttl_file, "w+") as f_out:
             f_out.write(file_content)
-    graph.run(f"""CALL n10s.rdf.import.fetch("file:{ttl_file}","Turtle");""")
+
+    cypher = """CALL n10s.rdf.import.fetch("file:""" + ttl_file.replace("\\", "\\\\") + """","Turtle");"""
+    print(graph.run(cypher).data())
     number += 1
