@@ -112,6 +112,6 @@ venv.bak/
 *.jpeg
 *.tiff
 *.json
-*/results/
-*/data/
-*/temp/
+**/results/
+**/data/
+**/temp/
