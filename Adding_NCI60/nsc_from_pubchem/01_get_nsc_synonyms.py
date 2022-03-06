@@ -40,8 +40,6 @@ while True:
             number_synonyms += 1
             synonym = synonym.lower()
             result = re.findall('"nsc[ -]?(\d+)"', synonym)
-            # if "655363" in synonym:
-            #     print(synonym)
             if result:
                 result_list.append([synonym_id, result[0], synonym])
     print("reading time", time() - start)
