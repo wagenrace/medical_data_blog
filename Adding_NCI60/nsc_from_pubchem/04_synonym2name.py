@@ -10,8 +10,16 @@ from time import time
 temp_dir = "temp"
 os.makedirs(temp_dir, exist_ok=True)
 nsc2synom = pd.read_csv(os.path.join("results", "nsc2synom_id.csv"))[["synonym_id", "NSC"]]
-nsc2synom = nsc2synom.set_index("synonym_id")
-nsc2synom["synonym"] = None
+
+# Some synonyms have multiple nsc number
+nsc2synom = nsc2synom.set_index('synonym_id')
+grouped_nsc = nsc2synom.groupby('synonym_id')["NSC"].apply(list)
+
+# Dict are way faster to lookup in as dataframes
+synom_id2nsc = grouped_nsc.to_dict()
+
+# Appending to a list is way faster as updating a dataframe
+result_list = []
 
 result_loc = os.path.join("results", "nsc2synonym.csv")
 
@@ -31,6 +39,7 @@ while True:
         print("download time", time() - start)
 
     start = time()
+    number_lines = 0
     with gzip.open(gz_file_loc, "r") as f:
         for line in f:
             line = line.decode("utf-8")
@@ -40,12 +49,17 @@ while True:
             synonym = synonym.lower()
 
             result = re.findall('"(.*)"@', synonym)[0]
-            if synonym_id in nsc2synom.index and result:
-                nsc2synom.loc[synonym_id, "synonym"] = result
+            nsc_numbers = synom_id2nsc.get(synonym_id, [])
+            if result:
+                for nsc in nsc_numbers:
+                    result_list.append([result, nsc])
+            number_lines += 1
+            if number_lines % 10000 == 0:
+                print(f"reading time {number_lines}: {time() - start}")
 
     print("reading time", time() - start)
 
     number += 1
 
-result_df = nsc2synom[["synonym", "NSC"]]
+result_df = pd.DataFrame(result_list, columns=["synonym", "NSC"])
 result_df.to_csv(result_loc)
