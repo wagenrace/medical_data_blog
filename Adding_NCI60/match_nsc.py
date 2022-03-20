@@ -3,6 +3,7 @@ from py2neo import Graph
 import pandas as pd
 from os.path import join as path_join
 from tqdm import tqdm
+import re
 
 chem_names = pd.read_csv(
     path_join("data", "chemnames_Aug2013.txt"),
@@ -22,14 +23,12 @@ port = "7687"
 pswd = input("password")
 
 graph = Graph("bolt://localhost:" + port, auth=(user, pswd))
-results = pd.DataFrame(
-    columns=["NSC", "MeshLabel", "MeshType", "MeshNumResults", "NumberTerms"]
-)
+results = []
 
 for nsc_number in tqdm(all_nsc):
-    # # Chem names
-    # all_chem_names = chem_names.loc[chem_names["NSC"] == nsc_number]["Name"]
-    # all_chem_names = [i.lower() for i in all_chem_names]
+    # Chem names
+    all_chem_names = chem_names.loc[chem_names["NSC"] == nsc_number]["Name"]
+    all_chem_names = [i.lower() for i in all_chem_names]
 
     # NSC as names
     nsc_names = [f"nsc{nsc_number}", f"nsc {nsc_number}", f"nsc-{nsc_number}"]
@@ -39,8 +38,12 @@ for nsc_number in tqdm(all_nsc):
     all_pubchem_names = [i.lower() for i in all_pubchem_names]
 
     # Combine names
-    all_synonyms = nsc_names + all_pubchem_names  # + all_chem_names
-    cypher_all_synonyms = f"""[{','.join([f'"{i}"' for i in all_synonyms])}]"""
+    all_synonyms = nsc_names + all_pubchem_names + all_chem_names
+
+    filtered_names = [
+        f'"{i}"' for i in all_synonyms if len(re.findall('[\[\+\\\=\*\^"]', i)) == 0
+    ]
+    cypher_all_synonyms = f"""[{','.join(filtered_names)}]"""
 
     # Find all terms
     response = graph.run(
@@ -48,15 +51,14 @@ for nsc_number in tqdm(all_nsc):
     ).data()
     num_terms = response[0]["num_terms"]
     if num_terms == 0:
-        results = results.append(
-            {
-                "NSC": nsc_number,
-                "MeshLabel": None,
-                "MeshType": None,
-                "MeshNumResults": 0,
-                "NumberTerms": num_terms,
-            },
-            ignore_index=True,
+        results.append(
+            [
+                nsc_number,
+                None,
+                None,
+                0,
+                num_terms,
+            ]
         )
         continue
 
@@ -74,14 +76,13 @@ for nsc_number in tqdm(all_nsc):
             label_count[label] = all_labels.count(label)
         most_common_label = max(label_count, key=lambda x: label_count[x])
         results = results.append(
-            {
-                "NSC": nsc_number,
-                "MeshLabel": most_common_label,
-                "MeshType": "Concept",
-                "MeshNumResults": num_concepts,
-                "NumberTerms": num_terms,
-            },
-            ignore_index=True,
+            [
+                nsc_number,
+                most_common_label,
+                "Concept",
+                num_concepts,
+                num_terms,
+            ]
         )
         continue
 
@@ -99,14 +100,13 @@ for nsc_number in tqdm(all_nsc):
             label_count[label] = all_labels.count(label)
         most_common_label = max(label_count, key=lambda x: label_count[x])
         results = results.append(
-            {
-                "NSC": nsc_number,
-                "MeshLabel": most_common_label,
-                "MeshType": "SCR_Chemical",
-                "MeshNumResults": num_scr,
-                "NumberTerms": num_terms,
-            },
-            ignore_index=True,
+            [
+                nsc_number,
+                most_common_label,
+                "SCR_Chemical",
+                num_scr,
+                num_terms,
+            ]
         )
         continue
 
@@ -121,4 +121,6 @@ for nsc_number in tqdm(all_nsc):
         },
         ignore_index=True,
     )
-results.to_csv(path_join("results", "nsc_gi502mesh.csv"))
+
+results_pd = pd.DataFrame(results, columns=["NSC", "MeshLabel", "MeshType", "MeshNumResults", "NumberTerms"])
+results_pd.to_csv(path_join("results", "nsc_gi502mesh_chemnames_pubchem_full.csv"))
